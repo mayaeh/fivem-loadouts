@@ -1,6 +1,7 @@
 dependency "essentialmode"
 
 server_scripts {
+    '@mysql-async/lib/MySQL.lua',
     'server/settings.lua',
     'server/server.lua',
     'server/commands.lua'

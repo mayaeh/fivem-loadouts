@@ -2,9 +2,9 @@
 if SETTINGS["enable_database"] then
     print("STARTING CONNECTION")
     -- Set up MySql connection
-    require "resources/essentialmode/lib/MYSQL"
-    print("Opening connection with " .. SETTINGS["database"].ip)
-    MySQL:open(SETTINGS["database"].ip, SETTINGS["database"].database, SETTINGS["database"].username, SETTINGS["database"].password)
+    MySQL.ready(function ()
+      MySQL.Sync.execute('SELECT identifier FROM loadouts', {})
+    end)
 end
 
 
@@ -18,7 +18,7 @@ AddEventHandler("loadout:playerSpawned", function(spawn)
     Uncomment the line below and remove the line above to load the player's
     loadout from the database when they spawn
     ]]
-    -- TriggerEvent("loadout:loadFromDatabase", source)
+    TriggerEvent("loadout:loadFromDatabase", source)
 end)
 
 RegisterServerEvent("loadout:saveLoadout")
@@ -40,19 +40,26 @@ AddEventHandler("loadout:saveLoadout", function(d)
     TriggerEvent("es:getPlayerFromId", source, function(user)
         newData["@id"] = user.identifier
 
-        local getCurrentQuery = MySQL:executeQuery("SELECT * FROM loadouts WHERE identifier = '@id'", {["@id"] = user.identifier})
-        local result = MySQL:getResults(getCurrentQuery, fields, "identifier")
+        MySQL.Async.fetchall("SELECT * FROM loadouts WHERE identifier = '@id'", {["@id"] = user.identifier}, function(result)
 
-        if result[1] == nil then
-            -- Insert
-            MySQL:executeQuery("INSERT INTO loadouts (`identifier`, `loadout_name`, `hair`, `haircolour`, `torso`, `torsotexture`, `torsoextra`, `torsoextratexture`, `pants`, `pantscolour`, `shoes`, `shoescolour`, `bodyaccessory`) " ..
-                                "VALUES ('@id', '@loadout_name_data', @hair_data, @haircolour_data, @torso_data, @torsotexture_data, @torsoextra_data, @torsoextratexture_data, @pants_data, @pantscolour_data, @shoes_data, @shoescolour_data, @bodyaccessory_data)",
-                                newData)
-        else
-            -- update
-            MySQL:executeQuery("UPDATE loadouts SET `loadout_name`='@loadout_name_data', `hair`='@hair_data', `haircolour`='@haircolour_data', `torso`='@torso_data', `torsotexture`='@torsotexture_data', `torsoextra`='@torsoextra_data', `torsoextratexture`='@torsoextratexture_data', `pants`='@pants_data', `pantscolour`='@pantscolour_data', `shoes`='@shoes_data', `shoescolour`='@shoescolour_data', `bodyaccessory`='@bodyaccessory_data' WHERE identifier='@id'",
-                newData)
-        end
+            if result[1] == nil then
+                -- Insert
+
+                MySQL.Async.insert("INSERT INTO loadouts (`identifier`, `loadout_name`, `hair`, `haircolour`, `torso`, `torsotexture`, `torsoextra`, `torsoextratexture`, `pants`, `pantscolour`, `shoes`, `shoescolour`, `bodyaccessory`) " ..
+                  "VALUES ('@id', '@loadout_name_data', @hair_data, @haircolour_data, @torso_data, @torsotexture_data, @torsoextra_data, @torsoextratexture_data, @pants_data, @pantscolour_data, @shoes_data, @shoescolour_data, @bodyaccessory_data)", newData, function(insert_result)
+                    print("insert: ")
+                    print(insert_result)
+                end)
+
+              else
+                -- update
+
+                MySQL.Async.execute("UPDATE loadouts SET `loadout_name`='@loadout_name_data', `hair`='@hair_data', `haircolour`='@haircolour_data', `torso`='@torso_data', `torsotexture`='@torsotexture_data', `torsoextra`='@torsoextra_data', `torsoextratexture`='@torsoextratexture_data', `pants`='@pants_data', `pantscolour`='@pantscolour_data', `shoes`='@shoes_data', `shoescolour`='@shoescolour_data', `bodyaccessory`='@bodyaccessory_data' WHERE identifier='@id'", newdata, function(update_result)
+                    print("update: ")
+                    print(update_result)
+                end)
+            end
+        end)
 
         --TriggerClientEvent("chatMessage", source, "Loadouts", {255, 255, 255}, "Successfully saved your loadout!")
         TriggerClientEvent("loadout:translateChatMessage", source, "saved_loadout", SETTINGS[colour], {})
@@ -71,21 +78,20 @@ AddEventHandler("loadout:loadFromDatabase", function(playerId)
 
     TriggerEvent("es:getPlayerFromId", playerId, function(user)
 
-        local getCurrentQuery = MySQL:executeQuery("SELECT * FROM loadouts WHERE identifier = '@id'", {["@id"] = user.identifier})
-        local result = MySQL:getResults(getCurrentQuery, fields, "identifier")
+        MySQL.Async.fetchAll("SELECT * FROM loadouts WHERE identifier = '@id'", {["@id"] = user.identifier}, function(result)
 
-        if result[1] == nil then
-            --TriggerClientEvent("chatMessage", playerId, "Loadouts", {255, 255, 255}, "Sorry, you don't have any loadouts saved.")
-            TriggerClientEvent("loadout:translateChatMessage", playerId, "none_saved", SETTINGS["colour"], {})
-        else
-            --Load them up!
-            local r = result[1]
+            if result[1] == nil then
+                --TriggerClientEvent("chatMessage", playerId, "Loadouts", {255, 255, 255}, "Sorry, you don't have any loadouts saved.")
+                TriggerClientEvent("loadout:translateChatMessage", playerId, "none_saved", SETTINGS["colour"], {})
+            else
+                --Load them up!
+                local r = result[1]
 
-            TriggerEvent("loadout:doLoadout", playerId, r.loadout_name, r) -- Force our variance
+                TriggerEvent("loadout:doLoadout", playerId, r.loadout_name, r) -- Force our variance
 
-            ---TriggerClientEvent("loadout:loadVariants", playerId, r, 1000)
-        end
-
+                ---TriggerClientEvent("loadout:loadVariants", playerId, r, 1000)
+            end
+        end)
     end)
 
 end)
